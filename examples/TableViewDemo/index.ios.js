@@ -257,9 +257,12 @@ class CustomEditableExample extends React.Component {
             var newData = (this.dataItemKeysBeingEdited || []).map(itemKey=>self.state.data[itemKey]);
             this.dataItemKeysBeingEdited = null;
 
-            this.setState({editing: false}, function() {
+            this.setState({editing: false, data: newData}, function() {
                 //Simulate saving data remotely and getting a data-changed callback
-                setTimeout(()=>self.onExternalData(newData), 2);
+                setTimeout(()=> {
+                    self.onExternalData(newData);
+                    this.setState({editing: false});
+                });
             });
         } else {
             //Start editing - save snapshot of data
@@ -277,7 +280,7 @@ class CustomEditableExample extends React.Component {
 
         //The last data we rendered with hasn't changed, but native side *displayed* data has changed
         //due to local editing. Need to force to re-render with javascript data.
-        this.setState({editing: false, data: {...data,'___fake___':true}}, function() {
+        this.setState({editing: false, data: {...data,'___fake___':"1"}}, function() {
             self.setState({editing: false, data: data});
         })
     }
