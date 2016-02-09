@@ -1,7 +1,7 @@
 'use strict';
 
 var React = require('react-native');
-var { AppRegistry, Text, Dimensions, View, TouchableHighlight } = React;
+var { AppRegistry, Text, Dimensions, View, TouchableHighlight, TextInput } = React;
 var TableView = require('react-native-tableview');
 var Section = TableView.Section;
 var Item = TableView.Item;
@@ -15,7 +15,7 @@ class NavBar extends React.Component {
         return <NavigationBar style={{backgroundColor: '#0db0d9'}}
                               titleColor='white'
                               buttonsColor='white'
-                              statusBar='lightContent' {...this.props} />
+                              {...this.props} />
     }
 }
 class Example1 extends React.Component {
@@ -232,28 +232,20 @@ class FirebaseExample extends React.Component {
 }
 
 
-class FirebaseEditableExample extends React.Component {
+class CustomEditableExample extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {data:null,editing:false};
-        this.reactCellModule = "TableViewExampleCell";
-        //TODO replace this with your test location - warning, this example will overwrite data!
-        this.firebaseLocation = "https://dinosaur-facts.firebaseio.com/dinosaurs";
+        this.state = {data:null,editing:false,text:""};
+        this.reactCellModule = "TableViewExampleCell2";
     }
-    componentDidMount() {
+    onExternalData(data) {
         var self = this;
-        this.ref = new Firebase(this.firebaseLocation);
-        this.ref.on('value', function(snapshot) {
-            if (self.state.editing) {
-                console.warn("Ignoring update from firebase while editing data locally");
-                self.dataToSetAfterCancelling = snapshot.val();
-            } else {
-                self.setState({data:snapshot.val()});
-            }
-        });
-    }
-    componentWillUnmount() {
-        this.ref.off();
+        if (self.state.editing) {
+            console.warn("Ignoring update from firebase while editing data locally");
+            self.dataToSetAfterCancelling = data;
+        } else {
+            self.setState({data:data});
+        }
     }
     editOrSave() {
         if (this.state.editing) {
@@ -265,19 +257,15 @@ class FirebaseEditableExample extends React.Component {
             var newData = (this.dataItemKeysBeingEdited || []).map(itemKey=>self.state.data[itemKey]);
             this.dataItemKeysBeingEdited = null;
 
-            this.setState({editing: false}, function() {
-                //Save to firebase and override any remote changes that happened while we were editing.
-                //Do this in setState(editing=false) callback to make sure it's set by the time we get the 'value'
-                //callback.
-
-                //NOTE: this changes the data into an array!
-                self.ref.set(newData);
+            this.setState({editing: false, data: newData}, function() {
+                //Simulate saving data remotely and getting a data-changed callback
+                setTimeout(()=> self.onExternalData(newData), 2);
             });
         } else {
             //Start editing - save snapshot of data
             this.dataToSetAfterCancelling = this.state.data;
             //Must be same ordering as used in rendering items
-            this.dataItemKeysBeingEdited = Object.keys(this.state.data);
+            this.dataItemKeysBeingEdited = Object.keys(this.state.data || {});
             this.setState({editing: true});
         }
     }
@@ -289,12 +277,12 @@ class FirebaseEditableExample extends React.Component {
 
         //The last data we rendered with hasn't changed, but native side *displayed* data has changed
         //due to local editing. Need to force to re-render with javascript data.
-        this.setState({editing: false, data: {'___fake___':true,...data}}, function() {
+        this.setState({editing: false, data: {...data,'___fake___':"1"}}, function() {
             self.setState({editing: false, data: data});
         })
     }
     moveItem(info) {
-        if (info.sourceIndex >= this.dataItemKeysBeingEdited.length
+        if (!this.dataItemKeysBeingEdited || info.sourceIndex >= this.dataItemKeysBeingEdited.length
             || info.destinationIndex >= this.dataItemKeysBeingEdited.length) {
             console.error("moved row source/destination indices are out of range");
             return;
@@ -304,7 +292,23 @@ class FirebaseEditableExample extends React.Component {
         this.dataItemKeysBeingEdited.splice(info.destinationIndex, 0, itemKey);
     }
     deleteItem(info) {
+        if (!this.dataItemKeysBeingEdited || info.selectedIndex >= this.dataItemKeysBeingEdited.length) {
+            console.error("deleted row index is out of range");
+            return;
+        }
         this.dataItemKeysBeingEdited.splice(info.selectedIndex, 1);
+    }
+    addItem() {
+        var {text} = this.state;
+        if (!text) return;
+        var self = this;
+
+        //Simulate saving data remotely and getting a data-changed callback
+        setTimeout(()=>self.onExternalData(!this.state.data?[text]:[...(this.state.data), text]), 2);
+
+        //clear text & hide keyboard
+        this.setState({text:""});
+        this.refs.addTextInput.blur();
     }
     onChange(info) {
         if (info.mode == 'move') {
@@ -317,42 +321,69 @@ class FirebaseEditableExample extends React.Component {
     }
     renderItem(itemData, key, index) {
         return (
-            <Item height={50} backgroundColor={index%2==0?"white":"grey"}
-                            key={key} label={JSON.stringify(itemData)}>
+            <Item key={key} label={itemData}>
             </Item>);
+    }
+    getNavProps() {
+        var self = this;
+        var navProps = {
+            title:{title:"Custom Editable"},
+            rightButton: {
+                title: (this.state.editing? 'Save':'Edit'),
+                handler: function onNext() {
+                    self.editOrSave();
+                }
+            }
+        };
+        navProps.leftButton = {
+            title: (this.state.editing?'Cancel':'Back'),
+            handler: function onNext() {
+                if (self.state.editing)
+                    self.cancelEditing();
+                else {
+                    Actions.pop();
+                }
+            }
+        };
+        return navProps;
+    }
+    getAddItemRow() {
+        return (
+            <View style={{paddingBottom: 4, height:44, flexDirection:"row", alignItems:"stretch"}}>
+                <TextInput ref="addTextInput"
+                           style={{flex:1, height: 40, borderColor: 'gray', borderWidth: 1}}
+                           onChangeText={(text) => this.setState({text:text})}
+                           value={this.state.text}
+                    />
+
+                <TouchableHighlight onPress={(event)=>{this.addItem()}}
+                                    style={{borderRadius:5, width:100,backgroundColor:"red",alignItems:"center",justifyContent:"center"}}>
+                    <Text>Add</Text>
+                </TouchableHighlight>
+            </View>
+        );
     }
     render() {
         var {data, editing} = this.state;
         if (!data) {
-            return <Text style={{height:580}}>NO DATA</Text>
+            data = {};
         }
 
         var self = this;
         var items = Object.keys(data).map((key,index)=>self.renderItem(data[key], key, index));
 
         return (
-            <View style={{flex:1, marginTop:70}}>
+            <View style={{flex:1, marginTop:0}}>
 
-                <View style={{paddingBottom: 4, height:44, flexDirection:"row", alignItems:"stretch"}}>
+                <NavBar {...this.getNavProps()}/>
 
-                    <TouchableHighlight onPress={(event)=>{this.editOrSave()}}
-                                        style={{borderRadius:5, width:100,backgroundColor:"lightblue",alignItems:"center",justifyContent:"center"}}>
-                        <Text style={{backgroundColor:"transparent"}}>{editing?"Save":"Edit"}</Text>
-                    </TouchableHighlight>
-
-                    {editing &&
-                    <TouchableHighlight onPress={(event)=>{this.cancelEditing()}}
-                                        style={{borderRadius:5, width:100,backgroundColor:"red",alignItems:"center",justifyContent:"center"}}>
-                        <Text>Cancel</Text>
-                    </TouchableHighlight>}
-                </View>
+                {!editing && this.getAddItemRow()}
 
                 <TableView editing={editing} style={{flex:1}} reactModuleForCell={this.reactCellModule}
                            tableViewCellStyle={TableView.Consts.CellStyle.Default}
-                           onPress={(event) => alert(JSON.stringify(event))}
                            onChange={this.onChange.bind(this)}
                     >
-                    <Section canMove={editing} canEdit={editing} arrow={editing}>
+                    <Section canMove={editing} canEdit={editing} arrow={!editing}>
                         {items}
                     </Section>
                 </TableView>
@@ -456,7 +487,7 @@ class Launch extends React.Component {
                     <Item onPress={Actions.example6}>Firebase Example</Item>
                     <Item onPress={Actions.example7}>Large ListView (scroll memory growth)</Item>
                     <Item onPress={Actions.example8}>Reusable Large TableView Example</Item>
-                    <Item onPress={Actions.example9}>Firebase Editing Example</Item>
+                    <Item onPress={Actions.example9}>Custom Editing Example</Item>
                 </Section>
             </TableView>
         );
@@ -472,13 +503,13 @@ class TableViewExample extends React.Component {
                 <Route name="example1" component={Example1} title="Example 1"/>
                 <Route name="example2" component={Example2} title="Example 2"/>
                 <Route name="example3" component={Example3} title="Example 3"/>
-                <Route name="edit" component={Edit} title="Edit Table" hideNavBar={true}/>
+                <Route name="edit" component={Edit} hideNavBar={true}/>
                 <Route name="example4" component={ReusableCellExample1} title="Reusable Cell Example 1"/>
                 <Route name="example5" component={ReusableCellExample2} title="Reusable Custom Cells"/>
                 <Route name="example6" component={FirebaseExample} title="Firebase Example"/>
                 <Route name="example7" component={ListViewExample} title="Large ListView Example"/>
                 <Route name="example8" component={LargeTableExample} title="Reusable Large TableView Example"/>
-                <Route name="example9" component={FirebaseEditableExample} title="Firebase Editing Example"/>
+                <Route name="example9" component={CustomEditableExample} hideNavBar={true} title="Custom Editing Example"/>
             </Router>
 
         );
@@ -500,6 +531,24 @@ class TableViewExampleCell extends React.Component {
             style.backgroundColor = this.props.data.backgroundColor;
         }
         return (<View style={style}><Text>section:{this.props.section},row:{this.props.row},label:{this.props.data.label}</Text></View>);
+    }
+}
+
+//Should be pure... setState on top-level component doesn't seem to work
+class TableViewExampleCell2 extends React.Component {
+    render(){
+        var style = {};
+        //cell height is passed from <Item> child of tableview and native code passes it back up to javascript in "app params" for the cell.
+        //This way our component will fill the full native table cell height.
+        if (this.props.data.height !== undefined) {
+            style.height = this.props.data.height;
+        } else {
+            style.flex = 1;
+        }
+        if (this.props.data.backgroundColor !== undefined) {
+            style.backgroundColor = this.props.data.backgroundColor;
+        }
+        return (<View style={style}><Text>{this.props.data.label}</Text></View>);
     }
 }
 
@@ -539,4 +588,5 @@ class DinosaurCellExample extends React.Component {
 
 AppRegistry.registerComponent('TableViewExample', () => TableViewExample);
 AppRegistry.registerComponent('TableViewExampleCell', () => TableViewExampleCell);
+AppRegistry.registerComponent('TableViewExampleCell2', () => TableViewExampleCell2);
 AppRegistry.registerComponent('DinosaurCellExample', () => DinosaurCellExample);
