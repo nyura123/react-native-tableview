@@ -259,10 +259,7 @@ class CustomEditableExample extends React.Component {
 
             this.setState({editing: false, data: newData}, function() {
                 //Simulate saving data remotely and getting a data-changed callback
-                setTimeout(()=> {
-                    self.onExternalData(newData);
-                    this.setState({editing: false});
-                });
+                setTimeout(()=> self.onExternalData(newData), 2);
             });
         } else {
             //Start editing - save snapshot of data
