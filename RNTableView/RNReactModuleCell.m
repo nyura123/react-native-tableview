@@ -31,6 +31,12 @@
     if (_rootView == nil) {
         //Create the mini react app that will populate our cell. This will be called from cellForRowAtIndexPath
         _rootView = [[RCTRootView alloc] initWithBridge:bridge moduleName:reactModule initialProperties:props];
+        NSLog(@"width: %@",data[@"width"]);
+        if (data[@"width"]) {
+            CGRect contentViewFrame = self.contentView.frame;
+            contentViewFrame.size.width = ((NSNumber*)data[@"width"]).floatValue;
+            self.contentView.frame = contentViewFrame;
+        }
         [self.contentView addSubview:_rootView];
         _rootView.frame = self.contentView.frame;
     } else {

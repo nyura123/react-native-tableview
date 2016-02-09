@@ -1,7 +1,7 @@
 'use strict';
 
 var React = require('react-native');
-var { AppRegistry, Text, Dimensions, View, TouchableHighlight } = React;
+var { AppRegistry, Text, Dimensions, View, TouchableHighlight, TextInput } = React;
 var TableView = require('react-native-tableview');
 var Section = TableView.Section;
 var Item = TableView.Item;
@@ -232,28 +232,20 @@ class FirebaseExample extends React.Component {
 }
 
 
-class FirebaseEditableExample extends React.Component {
+class CustomEditableExample extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {data:null,editing:false};
+        this.state = {data:null,editing:false,text:""};
         this.reactCellModule = "TableViewExampleCell";
-        //TODO replace this with your test location - warning, this example will overwrite data!
-        this.firebaseLocation = "https://dinosaur-facts.firebaseio.com/dinosaurs";
     }
-    componentDidMount() {
+    onExternalData(data) {
         var self = this;
-        this.ref = new Firebase(this.firebaseLocation);
-        this.ref.on('value', function(snapshot) {
-            if (self.state.editing) {
-                console.warn("Ignoring update from firebase while editing data locally");
-                self.dataToSetAfterCancelling = snapshot.val();
-            } else {
-                self.setState({data:snapshot.val()});
-            }
-        });
-    }
-    componentWillUnmount() {
-        this.ref.off();
+        if (self.state.editing) {
+            console.warn("Ignoring update from firebase while editing data locally");
+            self.dataToSetAfterCancelling = data;
+        } else {
+            self.setState({data:data});
+        }
     }
     editOrSave() {
         if (this.state.editing) {
@@ -266,12 +258,8 @@ class FirebaseEditableExample extends React.Component {
             this.dataItemKeysBeingEdited = null;
 
             this.setState({editing: false}, function() {
-                //Save to firebase and override any remote changes that happened while we were editing.
-                //Do this in setState(editing=false) callback to make sure it's set by the time we get the 'value'
-                //callback.
-
-                //NOTE: this changes the data into an array!
-                self.ref.set(newData);
+                //Simulate saving data remotely and getting a data-changed callback
+                setTimeout(()=>self.onExternalData(newData), 2);
             });
         } else {
             //Start editing - save snapshot of data
@@ -306,6 +294,18 @@ class FirebaseEditableExample extends React.Component {
     deleteItem(info) {
         this.dataItemKeysBeingEdited.splice(info.selectedIndex, 1);
     }
+    addItem() {
+        var {text} = this.state;
+        if (!text) return;
+        var self = this;
+
+        //Simulate saving data remotely and getting a data-changed callback
+        setTimeout(()=>self.onExternalData(!this.state.data?[text]:[...(this.state.data), text]), 2);
+
+        //clear text & hide keyboard
+        this.setState({text:""});
+        this.refs.addTextInput.blur();
+    }
     onChange(info) {
         if (info.mode == 'move') {
             this.moveItem(info);
@@ -317,14 +317,14 @@ class FirebaseEditableExample extends React.Component {
     }
     renderItem(itemData, key, index) {
         return (
-            <Item height={50} backgroundColor={index%2==0?"white":"grey"}
+            <Item width={342} height={50} backgroundColor={index%2==0?"white":"grey"}
                             key={key} label={JSON.stringify(itemData)}>
             </Item>);
     }
     render() {
         var {data, editing} = this.state;
         if (!data) {
-            return <Text style={{height:580}}>NO DATA</Text>
+            data = {};
         }
 
         var self = this;
@@ -347,12 +347,27 @@ class FirebaseEditableExample extends React.Component {
                     </TouchableHighlight>}
                 </View>
 
+                {!editing &&
+                <View style={{paddingBottom: 4, height:44, flexDirection:"row", alignItems:"stretch"}}>
+                    <TextInput ref="addTextInput"
+                        style={{flex:1, height: 40, borderColor: 'gray', borderWidth: 1}}
+                        onChangeText={(text) => this.setState({text:text})}
+                        value={this.state.text}
+                        />
+
+                    <TouchableHighlight onPress={(event)=>{this.addItem()}}
+                                        style={{borderRadius:5, width:100,backgroundColor:"red",alignItems:"center",justifyContent:"center"}}>
+                        <Text>Add</Text>
+                    </TouchableHighlight>
+                </View>
+                }
+
                 <TableView editing={editing} style={{flex:1}} reactModuleForCell={this.reactCellModule}
                            tableViewCellStyle={TableView.Consts.CellStyle.Default}
                            onPress={(event) => alert(JSON.stringify(event))}
                            onChange={this.onChange.bind(this)}
                     >
-                    <Section canMove={editing} canEdit={editing} arrow={editing}>
+                    <Section canMove={editing} canEdit={editing} arrow={!editing}>
                         {items}
                     </Section>
                 </TableView>
@@ -456,7 +471,7 @@ class Launch extends React.Component {
                     <Item onPress={Actions.example6}>Firebase Example</Item>
                     <Item onPress={Actions.example7}>Large ListView (scroll memory growth)</Item>
                     <Item onPress={Actions.example8}>Reusable Large TableView Example</Item>
-                    <Item onPress={Actions.example9}>Firebase Editing Example</Item>
+                    <Item onPress={Actions.example9}>Custom Editing Example</Item>
                 </Section>
             </TableView>
         );
@@ -478,7 +493,7 @@ class TableViewExample extends React.Component {
                 <Route name="example6" component={FirebaseExample} title="Firebase Example"/>
                 <Route name="example7" component={ListViewExample} title="Large ListView Example"/>
                 <Route name="example8" component={LargeTableExample} title="Reusable Large TableView Example"/>
-                <Route name="example9" component={FirebaseEditableExample} title="Firebase Editing Example"/>
+                <Route name="example9" component={CustomEditableExample} title="Custom Editing Example"/>
             </Router>
 
         );
