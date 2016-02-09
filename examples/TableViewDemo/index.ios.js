@@ -242,7 +242,6 @@ class CustomEditableExample extends React.Component {
         var self = this;
         if (self.state.editing) {
             console.warn("Ignoring update from firebase while editing data locally");
-            self.dataToSetAfterCancelling = data;
         } else {
             self.setState({data:data});
         }
@@ -250,36 +249,30 @@ class CustomEditableExample extends React.Component {
     editOrSave() {
         if (this.state.editing) {
             //Save edited data
-
-            this.dataToSetAfterCancelling = null;
-
+            
             var self = this;
-            var newData = (this.dataItemKeysBeingEdited || []).map(itemKey=>self.state.data[itemKey]);
+            var newData = (this.dataItemKeysBeingEdited || []).map(itemKey=>self.preEditData[itemKey]);
             this.dataItemKeysBeingEdited = null;
+            this.preEditData = null;
 
             this.setState({editing: false, data: newData}, function() {
                 //Simulate saving data remotely and getting a data-changed callback
                 setTimeout(()=> self.onExternalData(newData), 2);
             });
         } else {
-            //Start editing - save snapshot of data
-            this.dataToSetAfterCancelling = this.state.data;
+            this.preEditData = Object.assign({}, this.state.data);
             //Must be same ordering as used in rendering items
             this.dataItemKeysBeingEdited = Object.keys(this.state.data || {});
             this.setState({editing: true});
         }
     }
     cancelEditing() {
-        var data = this.dataToSetAfterCancelling;
-        this.dataToSetAfterCancelling = null;
+        var data = this.preEditData;
         this.dataItemKeysBeingEdited = null;
+        this.preEditData = null;
         var self = this;
 
-        //The last data we rendered with hasn't changed, but native side *displayed* data has changed
-        //due to local editing. Need to force to re-render with javascript data.
-        this.setState({editing: false, data: {...data,'___fake___':"1"}}, function() {
-            self.setState({editing: false, data: data});
-        })
+        self.setState({editing: false, data: data});
     }
     moveItem(info) {
         if (!this.dataItemKeysBeingEdited || info.sourceIndex >= this.dataItemKeysBeingEdited.length
@@ -290,6 +283,10 @@ class CustomEditableExample extends React.Component {
         var itemKey = this.dataItemKeysBeingEdited[info.sourceIndex];
         this.dataItemKeysBeingEdited.splice(info.sourceIndex, 1);
         this.dataItemKeysBeingEdited.splice(info.destinationIndex, 0, itemKey);
+
+        var self = this;
+        var newData = (this.dataItemKeysBeingEdited || []).map(itemKey=>self.preEditData[itemKey]);
+        this.setState({data: newData});
     }
     deleteItem(info) {
         if (!this.dataItemKeysBeingEdited || info.selectedIndex >= this.dataItemKeysBeingEdited.length) {
@@ -297,6 +294,10 @@ class CustomEditableExample extends React.Component {
             return;
         }
         this.dataItemKeysBeingEdited.splice(info.selectedIndex, 1);
+
+        var self = this;
+        var newData = (this.dataItemKeysBeingEdited || []).map(itemKey=>self.preEditData[itemKey]);
+        this.setState({data: newData});
     }
     addItem() {
         var {text} = this.state;
