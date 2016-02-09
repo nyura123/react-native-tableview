@@ -1,7 +1,7 @@
 'use strict';
 
 var React = require('react-native');
-var { AppRegistry, Text, Dimensions,View } = React;
+var { AppRegistry, Text, Dimensions, View, TouchableHighlight } = React;
 var TableView = require('react-native-tableview');
 var Section = TableView.Section;
 var Item = TableView.Item;
@@ -205,10 +205,7 @@ class FirebaseExample extends React.Component {
         });
         item[this.propPrefix+"key"] = key;
 
-        //concat all key-val's into one string
-        var label = Object.keys(itemData).map((k)=>k+":"+itemData[k]).join(",");
-
-        return (<Item {...item} height={140} backgroundColor={index%2==0?"white":"grey"} key={key} label={label}></Item>);
+        return (<Item {...item} height={140} backgroundColor={index%2==0?"white":"grey"} key={key} label={key}></Item>);
     }
     render() {
         var data = this.state.data;
@@ -226,6 +223,136 @@ class FirebaseExample extends React.Component {
                            tableViewCellStyle={TableView.Consts.CellStyle.Default}
                            onPress={(event) => alert(JSON.stringify(event))}>
                     <Section arrow={true}>
+                        {items}
+                    </Section>
+                </TableView>
+            </View>
+        );
+    }
+}
+
+
+class FirebaseEditableExample extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {data:null,editing:false};
+        this.reactCellModule = "TableViewExampleCell";
+        //TODO replace this with your test location - warning, this example will overwrite data!
+        this.firebaseLocation = "https://dinosaur-facts.firebaseio.com/dinosaurs";
+    }
+    componentDidMount() {
+        var self = this;
+        this.ref = new Firebase(this.firebaseLocation);
+        this.ref.on('value', function(snapshot) {
+            if (self.state.editing) {
+                console.warn("Ignoring update from firebase while editing data locally");
+                self.dataToSetAfterCancelling = snapshot.val();
+            } else {
+                self.setState({data:snapshot.val()});
+            }
+        });
+    }
+    componentWillUnmount() {
+        this.ref.off();
+    }
+    editOrSave() {
+        if (this.state.editing) {
+            //Save edited data
+
+            this.dataToSetAfterCancelling = null;
+
+            var self = this;
+            var newData = (this.dataItemKeysBeingEdited || []).map(itemKey=>self.state.data[itemKey]);
+            this.dataItemKeysBeingEdited = null;
+
+            this.setState({editing: false}, function() {
+                //Save to firebase and override any remote changes that happened while we were editing.
+                //Do this in setState(editing=false) callback to make sure it's set by the time we get the 'value'
+                //callback.
+
+                //NOTE: this changes the data into an array!
+                self.ref.set(newData);
+            });
+        } else {
+            //Start editing - save snapshot of data
+            this.dataToSetAfterCancelling = this.state.data;
+            //Must be same ordering as used in rendering items
+            this.dataItemKeysBeingEdited = Object.keys(this.state.data);
+            this.setState({editing: true});
+        }
+    }
+    cancelEditing() {
+        var data = this.dataToSetAfterCancelling;
+        this.dataToSetAfterCancelling = null;
+        this.dataItemKeysBeingEdited = null;
+        var self = this;
+
+        //The last data we rendered with hasn't changed, but native side *displayed* data has changed
+        //due to local editing. Need to force to re-render with javascript data.
+        this.setState({editing: false, data: {'___fake___':true,...data}}, function() {
+            self.setState({editing: false, data: data});
+        })
+    }
+    moveItem(info) {
+        if (info.sourceIndex >= this.dataItemKeysBeingEdited.length
+            || info.destinationIndex >= this.dataItemKeysBeingEdited.length) {
+            console.error("moved row source/destination indices are out of range");
+            return;
+        }
+        var itemKey = this.dataItemKeysBeingEdited[info.sourceIndex];
+        this.dataItemKeysBeingEdited.splice(info.sourceIndex, 1);
+        this.dataItemKeysBeingEdited.splice(info.destinationIndex, 0, itemKey);
+    }
+    deleteItem(info) {
+        this.dataItemKeysBeingEdited.splice(info.selectedIndex, 1);
+    }
+    onChange(info) {
+        if (info.mode == 'move') {
+            this.moveItem(info);
+        } else if (info.mode == 'delete') {
+            this.deleteItem(info);
+        } else {
+            console.error("unknown change mode: "+info.mode);
+        }
+    }
+    renderItem(itemData, key, index) {
+        return (
+            <Item height={50} backgroundColor={index%2==0?"white":"grey"}
+                            key={key} label={JSON.stringify(itemData)}>
+            </Item>);
+    }
+    render() {
+        var {data, editing} = this.state;
+        if (!data) {
+            return <Text style={{height:580}}>NO DATA</Text>
+        }
+
+        var self = this;
+        var items = Object.keys(data).map((key,index)=>self.renderItem(data[key], key, index));
+
+        return (
+            <View style={{flex:1, marginTop:70}}>
+
+                <View style={{paddingBottom: 4, height:44, flexDirection:"row", alignItems:"stretch"}}>
+
+                    <TouchableHighlight onPress={(event)=>{this.editOrSave()}}
+                                        style={{borderRadius:5, width:100,backgroundColor:"lightblue",alignItems:"center",justifyContent:"center"}}>
+                        <Text style={{backgroundColor:"transparent"}}>{editing?"Save":"Edit"}</Text>
+                    </TouchableHighlight>
+
+                    {editing &&
+                    <TouchableHighlight onPress={(event)=>{this.cancelEditing()}}
+                                        style={{borderRadius:5, width:100,backgroundColor:"red",alignItems:"center",justifyContent:"center"}}>
+                        <Text>Cancel</Text>
+                    </TouchableHighlight>}
+                </View>
+
+                <TableView editing={editing} style={{flex:1}} reactModuleForCell={this.reactCellModule}
+                           tableViewCellStyle={TableView.Consts.CellStyle.Default}
+                           onPress={(event) => alert(JSON.stringify(event))}
+                           onChange={this.onChange.bind(this)}
+                    >
+                    <Section canMove={editing} canEdit={editing} arrow={editing}>
                         {items}
                     </Section>
                 </TableView>
@@ -329,6 +456,7 @@ class Launch extends React.Component {
                     <Item onPress={Actions.example6}>Firebase Example</Item>
                     <Item onPress={Actions.example7}>Large ListView (scroll memory growth)</Item>
                     <Item onPress={Actions.example8}>Reusable Large TableView Example</Item>
+                    <Item onPress={Actions.example9}>Firebase Editing Example</Item>
                 </Section>
             </TableView>
         );
@@ -350,6 +478,7 @@ class TableViewExample extends React.Component {
                 <Route name="example6" component={FirebaseExample} title="Firebase Example"/>
                 <Route name="example7" component={ListViewExample} title="Large ListView Example"/>
                 <Route name="example8" component={LargeTableExample} title="Reusable Large TableView Example"/>
+                <Route name="example9" component={FirebaseEditableExample} title="Firebase Editing Example"/>
             </Router>
 
         );
