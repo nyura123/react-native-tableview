@@ -10,6 +10,7 @@
 #import "RNTableView.h"
 #import "RCTBridge.h"
 #import "RCTConvert.h"
+#import "RCTUIManager.h"
 
 @implementation RNTableViewManager
 
@@ -154,6 +155,18 @@ RCT_CUSTOM_VIEW_PROPERTY(footerFontFamily, NSString, RNTableView)
     view.footerFont = [RCTConvert UIFont:view.footerFont withFamily:json ?: defaultView.font.familyName];
 }
 
+RCT_EXPORT_METHOD(reloadData:(nonnull NSNumber *)reactTag)
+{
+    [self.bridge.uiManager addUIBlock:^(RCTUIManager *uiManager, NSDictionary<NSNumber *,UIView *> *viewRegistry) {
+        UIView *view = [uiManager viewForReactTag:reactTag];
+        for (UIView *subview in view.subviews) {
+            if ([subview isKindOfClass:[RNTableView class]]) {
+                [((RNTableView *)subview).tableView reloadData];
+                return;
+            }
+        }
+    }];
+}
 //
 //- (NSDictionary *)constantsToExport
 //{

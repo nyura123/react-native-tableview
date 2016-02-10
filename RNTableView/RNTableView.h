@@ -24,6 +24,7 @@
 
 - (instancetype)initWithEventDispatcher:(RCTEventDispatcher *)eventDispatcher bridge:(RCTBridge*) bridge NS_DESIGNATED_INITIALIZER;
 
+@property (strong, nonatomic) UITableView *tableView;
 @property (nonatomic, copy) NSMutableArray *sections;
 @property (nonatomic, copy) NSArray *additionalItems;
 @property (nonatomic, strong) NSString *json;
