@@ -18,6 +18,22 @@
 -(void)setFrame:(CGRect)frame {
     [super setFrame:frame];
     [_cellView setFrame:CGRectMake(0, 0, frame.size.width, frame.size.height)];
+    
+    if (!self.showsDragIconWhenEditing && self.editing) {
+        static NSString *reorderControlClass = @"UITableViewCellReorderControl";
+        for (UIView* view in self.subviews) {
+            if ([[[view class] description] isEqualToString:reorderControlClass]) {
+                view.transform = CGAffineTransformScale(CGAffineTransformIdentity, 2.0, 2.0); // expands hit area somewhat
+                for (UIImageView* cellGrip in view.subviews)
+                {
+                    if ([cellGrip isKindOfClass:[UIImageView class]]) {
+                        [cellGrip setImage:nil];
+                    }
+                }
+                break;
+            }
+        }
+    }
 }
 
 @end

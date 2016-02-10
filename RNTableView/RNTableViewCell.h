@@ -13,5 +13,6 @@
 @interface RNTableViewCell : UITableViewCell
 
 @property (nonatomic, weak) RNCellView *cellView;
+@property (nonatomic, assign) BOOL showsDragIconWhenEditing;
 
 @end
