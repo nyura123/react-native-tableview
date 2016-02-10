@@ -343,6 +343,7 @@ RCT_NOT_IMPLEMENTED(-initWithCoder:(NSCoder *)aDecoder)
     // check if it is standard cell or user-defined UI
     if ([self hasCustomCells:indexPath.section]){
         cell = ((RNCellView *)_cells[indexPath.section][indexPath.row]).tableViewCell;
+        ((RNTableViewCell *)cell).showsDragIconWhenEditing = self.showsDragIconWhenEditing;
     } else if (self.reactModuleForCell != nil && ![self.reactModuleForCell isEqualToString:@""]) {
         cell = [self setupReactModuleCell:tableView data:item indexPath:indexPath];
     } else {
