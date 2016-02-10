@@ -16,6 +16,7 @@
 #import "RNTableFooterView.h"
 #import "RNTableHeaderView.h"
 #import "RNReactModuleCell.h"
+#import "RNAppGlobals.h"
 
 @interface RNTableView()<UITableViewDataSource, UITableViewDelegate> {
     id<RNTableViewDatasource> datasource;
@@ -74,13 +75,7 @@
     RCTAssertParam(eventDispatcher);
     
     if ((self = [super initWithFrame:CGRectZero])) {
-        
-        //RCTRootView setAppProperties and initWithBridge call "_bridge.batchedBridge" which will return nil because the bridge that gets passed to this constructor is *already* the batched bridge.
-        //So we have to create a separate (parent) _bridge here ourselves.
-        _bridge = [[RCTBridge alloc] initWithBundleURL:bridge.bundleURL
-                                        moduleProvider:nil
-                                         launchOptions:nil];
-        
+        _bridge = [[RNAppGlobals sharedInstance] appBridge] ?: bridge;
         _eventDispatcher = eventDispatcher;
         _cellHeight = 44;
         _cells = [NSMutableArray array];
