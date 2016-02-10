@@ -22,7 +22,6 @@
     id<RNTableViewDatasource> datasource;
 }
 @property (strong, nonatomic) NSMutableArray *selectedIndexes;
-@property (strong, nonatomic) UITableView *tableView;
 
 @end
 
